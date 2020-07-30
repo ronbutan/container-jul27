@@ -1,0 +1,30 @@
+# start 
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: wp-secret
+  labels:
+    app: wpdb
+type: Opaque
+data:
+  ROOT_PASSWORD: Y2hhbmdlaXQ=
+---
+# deployment
+# database stateful so 1 replica; if more, need one to be master and the rest be read-only
+apiVersion: mysql.presslabs.org/v1alpha1
+kind: MysqlCluster
+metadata:
+    name: wp-db-cluster
+    labels:
+        app: wpdb
+spec:
+    replicas: 2
+    secretName: wp-secret
+    persistentVolumeClaims:
+    accessModes:
+    - ReadWriteOnce
+    resources:
+      requests:
+        storage: 1Gi
+    storgaeClassName: do-block-storage

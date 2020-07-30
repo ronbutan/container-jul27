@@ -1,0 +1,114 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nwapp-cm
+  labels:
+    app: northwind
+data:
+  DB_USER: root
+  DB_HOST: nwdb-cluster-mysql.nw.svc.cluster.local # FQDN
+---
+# deployment
+# database stateful so 1 replica; if more, need one to be master and the rest be read-only
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+    name: nwapp-deploy
+    labels:
+        app: northwind
+spec:
+    replicas: 3
+    selector:
+        matchLabels:
+            app: nwapp-northwind
+    template:
+        metadata:
+            name: nwapp-po
+            labels:
+                app: nwapp-northwind
+        spec:
+            containers:
+            -   name: nwapp-container
+                image: chukmunnlee/my-nwapp:v1
+                imagePullPolicy: IfNotPresent
+                resources:
+                    requests:
+                        cpu: "200m"
+                        memory: "32Mi"
+                    limits:
+                        memory: "64Mi"
+                env:
+                -   name: DB_PASSWORD
+                    valueFrom:
+                      secretKeyRef:
+                        name: mysql-secret
+                        key: ROOT_PASSWORD
+                -   name: INSTANCE_IP_ADDRESS
+                    valueFrom:
+                      fieldRef:
+                        fieldPath: status.podIP
+                envFrom:
+                -   configMapRef:
+                        name: nwapp-cm
+                ports:
+                -   name: nwapp-port
+                    containerPort: 3000
+---
+apiVersion: v1
+kind: Service
+metadata:
+    name: nwapp-svc
+    labels:
+        app: nwapp-northwind
+spec:
+    type: ClusterIP
+    selector:
+        app: nwapp-northwind
+    ports:
+    -   name: nwapp-svc-port
+        port: 80
+        targetPort: nwapp-port
+---
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
+metadata:
+    name: nwapp-ing
+    labels:
+        app: nwapp-northwind
+spec:
+    rules:
+    - host: nwapp.167.172.5.17.nip.io
+      http:
+        paths:
+        - path: /
+          backend:
+            serviceName: nwapp-svc
+            servicePort: nwapp-svc-port
+---
+apiVersion: autoscaling/v2beta2
+kind: HorizontalPodAutoscaler
+metadata:
+    name: nwapp-hpa
+    labels:
+        app: nwapp-northwind
+spec:
+    minReplicas: 1
+    maxReplicas: 4
+    scaleTargetRef:
+        apiVersion: apps/v1
+        kind: Deployment
+        name: nwapp-deploy
+    metrics:
+    - type: Resource
+      resource:
+        name: memory
+        target:
+            type: Utilization
+            averageUtilization: 80
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+            type: Utilization
+            averageUtilization: 50

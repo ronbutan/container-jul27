@@ -1,0 +1,18 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: wpapp-pvc
+  labels:
+    app: wpapp
+    app.kubernetes.io/name: wp
+  annotations:
+    volume.beta.kubernetes.io/storage-provisioner: dobs.csi.digitalocean.com # standard label for provisioning tools to recognize for automation
+spec:
+  accessModes:
+  - ReadOnlyMany
+  storageClassName: do-block-storage
+  resources:
+    requests:
+      # G - 1000MB, Gi - 1024MB
+      storage: 1Gi
